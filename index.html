@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>運動紀錄 APP</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <h1>運動紀錄</h1>
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="checkin">簽到</button>
+      <button class="tab-btn" data-tab="weights">重訓紀錄</button>
+      <button class="tab-btn" data-tab="self">自主訓練</button>
+      <button class="tab-btn" data-tab="settings">設定</button>
+    </nav>
+  </header>
+
+  <div id="config-warning" class="warning hidden">
+    尚未設定 Google Apps Script URL，請先依照 README 步驟部署後編輯
+    <code>js/config.js</code>。
+  </div>
+
+  <main>
+
+    <!-- ===== 簽到頁 ===== -->
+    <section id="tab-checkin" class="tab-panel active">
+      <h2>簽到</h2>
+      <form id="checkin-form" class="card">
+        <label>
+          選擇使用者（已簽到過的可直接選，會自動帶入據點）
+          <select id="checkin-user">
+            <option value="">-- 新使用者（請填下方姓名） --</option>
+          </select>
+        </label>
+        <label>
+          據點
+          <select id="checkin-location" required></select>
+        </label>
+        <label>
+          姓名
+          <input id="checkin-name" type="text" required maxlength="30" placeholder="輸入姓名">
+        </label>
+        <label>
+          日期
+          <input id="checkin-date" type="date" required>
+        </label>
+        <button type="submit" class="primary">送出簽到</button>
+      </form>
+
+      <div class="card">
+        <h3>最近簽到紀錄</h3>
+        <p class="hint">先送出一次簽到，下方會列出該 (姓名 + 據點) 的最近 10 筆紀錄。</p>
+        <table id="checkin-table" class="data-table">
+          <thead><tr><th>日期</th><th>姓名</th><th>據點</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== 重訓頁 ===== -->
+    <section id="tab-weights" class="tab-panel">
+      <h2>重量訓練紀錄</h2>
+
+      <div class="card">
+        <h3>選擇使用者</h3>
+        <div class="row">
+          <label>
+            使用者
+            <select id="weights-user" required>
+              <option value="">-- 請選擇 --</option>
+            </select>
+          </label>
+          <button id="weights-load" type="button">載入紀錄</button>
+        </div>
+        <p class="hint">找不到？請先到「簽到」頁完成一次簽到。</p>
+      </div>
+
+      <form id="weights-form" class="card">
+        <h3>新增一筆重訓</h3>
+        <label>
+          日期
+          <input id="weights-date" type="date" required>
+        </label>
+        <label>
+          動作類型
+          <input id="weights-action" type="text" required maxlength="40" placeholder="例如：臥推、深蹲、硬舉">
+        </label>
+        <div class="row">
+          <label>
+            重量 (kg)
+            <input id="weights-kg" type="number" min="0" step="0.5" required>
+          </label>
+          <label>
+            反覆次數
+            <input id="weights-reps" type="number" min="1" step="1" required>
+          </label>
+          <label>
+            組數
+            <input id="weights-sets" type="number" min="1" step="1" required>
+          </label>
+        </div>
+        <button type="submit" class="primary">新增紀錄</button>
+      </form>
+
+      <div class="card">
+        <h3>紀錄列表</h3>
+        <table id="weights-table" class="data-table">
+          <thead>
+            <tr>
+              <th>日期</th><th>動作</th><th>重量</th><th>次數</th><th>組數</th><th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== 自主訓練頁 ===== -->
+    <section id="tab-self" class="tab-panel">
+      <h2>自主訓練紀錄</h2>
+
+      <div class="card">
+        <h3>選擇使用者</h3>
+        <div class="row">
+          <label>
+            使用者
+            <select id="self-user" required>
+              <option value="">-- 請選擇 --</option>
+            </select>
+          </label>
+          <button id="self-load" type="button">載入紀錄</button>
+        </div>
+        <p class="hint">找不到？請先到「簽到」頁完成一次簽到。</p>
+      </div>
+
+      <form id="self-form" class="card">
+        <h3>新增一筆自主訓練</h3>
+        <label>
+          日期
+          <input id="self-date" type="date" required>
+        </label>
+        <div class="row">
+          <label>
+            每日步數
+            <input id="self-daily-steps" type="number" min="0" step="1" placeholder="例如 8000">
+          </label>
+          <label>
+            每週步數
+            <input id="self-weekly-steps" type="number" min="0" step="1" placeholder="例如 50000">
+          </label>
+          <label>
+            每週運動時間 (分鐘)
+            <input id="self-weekly-min" type="number" min="0" step="1" placeholder="例如 210">
+          </label>
+        </div>
+        <button type="submit" class="primary">新增紀錄</button>
+      </form>
+
+      <div class="card">
+        <h3>紀錄列表</h3>
+        <table id="self-table" class="data-table">
+          <thead>
+            <tr>
+              <th>日期</th><th>每日步數</th><th>每週步數</th><th>每週分鐘</th><th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ===== 設定頁 ===== -->
+    <section id="tab-settings" class="tab-panel">
+      <h2>設定</h2>
+
+      <form id="settings-form" class="card">
+        <h3>新增據點</h3>
+        <label>
+          據點名稱
+          <input id="settings-new-location" type="text" required maxlength="30" placeholder="例如：台北館">
+        </label>
+        <button type="submit" class="primary">新增</button>
+      </form>
+
+      <div class="card">
+        <h3>所有據點</h3>
+        <table id="settings-table" class="data-table">
+          <thead><tr><th>據點</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3>連線測試</h3>
+        <p class="hint">點一下按鈕確認 Google Apps Script 是否能正確呼叫。</p>
+        <button id="settings-test" type="button">測試連線</button>
+        <p id="settings-test-result"></p>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="toast"></div>
+
+  <!-- JS 載入順序：config → api → pages → app -->
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/pages/settings.js"></script>
+  <script src="js/pages/checkin.js"></script>
+  <script src="js/pages/weights.js"></script>
+  <script src="js/pages/self.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
