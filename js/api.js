@@ -48,6 +48,8 @@ const Api = {
   // check-in
   checkIn:            (p)      => callApi('checkIn', p),
   listCheckIns:       (p)      => callApi('listCheckIns', p),
+  listCheckInsByName: (name)   => callApi('listCheckInsByName', { name }),
+  deleteCheckIn:      (id)     => callApi('deleteCheckIn', { id }),
 
   // weight training
   addWeightRecord:    (p)      => callApi('addWeightRecord', p),

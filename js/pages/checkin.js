@@ -66,9 +66,69 @@ const CheckinPage = (function () {
     }
   }
 
+  // ===== 簽到查詢 =====
+  let lastQueryName = '';
+
+  async function handleQuery() {
+    const name = document.getElementById('checkin-name').value.trim();
+    if (!name) {
+      showToast('請先輸入姓名再查詢', 'error');
+      return;
+    }
+    try {
+      const rows = await Api.listCheckInsByName(name);
+      lastQueryName = name;
+      renderQueryResults(name, rows);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function renderQueryResults(name, rows) {
+    const section = document.getElementById('checkin-query-section');
+    const label = document.getElementById('checkin-query-name-label');
+    const tbody = document.querySelector('#checkin-query-table tbody');
+    label.textContent = name;
+    section.classList.remove('hidden');
+    tbody.innerHTML = '';
+    if (!rows.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="4">查無紀錄</td></tr>';
+      return;
+    }
+    rows.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td>' + escapeHtml(r.check_date) + '</td>' +
+        '<td>' + escapeHtml(r.name) + '</td>' +
+        '<td>' + escapeHtml(r.location) + '</td>' +
+        '<td style="text-align:right"></td>';
+      const delBtn = document.createElement('button');
+      delBtn.className = 'danger';
+      delBtn.textContent = '刪除';
+      delBtn.addEventListener('click', () => handleQueryDelete(r.id));
+      tr.lastElementChild.appendChild(delBtn);
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function handleQueryDelete(id) {
+    if (!confirm('確定要刪除這筆簽到紀錄嗎？')) return;
+    try {
+      await Api.deleteCheckIn(id);
+      showToast('已刪除', 'success');
+      if (lastQueryName) {
+        const rows = await Api.listCheckInsByName(lastQueryName);
+        renderQueryResults(lastQueryName, rows);
+      }
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
   function init() {
     document.getElementById('checkin-form').addEventListener('submit', handleSubmit);
     document.getElementById('checkin-user').addEventListener('change', handleUserChange);
+    document.getElementById('checkin-query-btn').addEventListener('click', handleQuery);
     document.getElementById('checkin-date').value = todayIso();
   }
 

@@ -47,7 +47,10 @@
           日期
           <input id="checkin-date" type="date" required>
         </label>
-        <button type="submit" class="primary">送出簽到</button>
+        <div class="row">
+          <button type="submit" class="primary">送出簽到</button>
+          <button id="checkin-query-btn" type="button">簽到查詢</button>
+        </div>
       </form>
 
       <div class="card">
@@ -55,6 +58,15 @@
         <p class="hint">先送出一次簽到，下方會列出該 (姓名 + 據點) 的最近 10 筆紀錄。</p>
         <table id="checkin-table" class="data-table">
           <thead><tr><th>日期</th><th>姓名</th><th>據點</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div id="checkin-query-section" class="card hidden">
+        <h3>查詢結果</h3>
+        <p class="hint">姓名 <strong id="checkin-query-name-label"></strong> 的所有簽到紀錄（跨據點）</p>
+        <table id="checkin-query-table" class="data-table">
+          <thead><tr><th>日期</th><th>姓名</th><th>據點</th><th></th></tr></thead>
           <tbody></tbody>
         </table>
       </div>

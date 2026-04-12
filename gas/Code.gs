@@ -188,6 +188,27 @@ const actions = {
     return limit > 0 ? rows.slice(0, limit) : rows;
   },
 
+  // 僅依姓名查詢所有簽到紀錄（跨據點）
+  listCheckInsByName: function (req) {
+    const name = String(req.name || '').trim();
+    if (!name) throw new Error('請輸入姓名');
+    return readAll('check_ins')
+      .filter(function (r) { return String(r.name) === name; })
+      .map(function (r) {
+        return {
+          id: r.id,
+          name: r.name,
+          location: r.location,
+          check_date: toDateString(r.check_date)
+        };
+      })
+      .sort(function (a, b) { return a.check_date < b.check_date ? 1 : -1; });
+  },
+
+  deleteCheckIn: function (req) {
+    return deleteRowById('check_ins', req.id);
+  },
+
   // ---- weight training ----
   addWeightRecord: function (req) {
     const name = (req.name || '').trim();
