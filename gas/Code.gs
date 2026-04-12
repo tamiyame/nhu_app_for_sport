@@ -163,9 +163,16 @@ const actions = {
     const name = (req.name || '').trim();
     const location = (req.location || '').trim();
     if (!name || !location) throw new Error('姓名與據點皆必填');
+    const date = req.date ? req.date : toDateString(new Date());
+    // 當日重複檢查：同一 (姓名, 據點, 日期) 已存在就拒絕
+    const dup = readAll('check_ins').some(function (r) {
+      return String(r.name) === name
+        && String(r.location) === location
+        && toDateString(r.check_date) === date;
+    });
+    if (dup) throw new Error('今天已經簽到過了喔!');
     upsertUser(name, location);
     const id = uuid();
-    const date = req.date ? req.date : toDateString(new Date());
     sheet('check_ins').appendRow([id, name, location, date, new Date()]);
     return { id: id };
   },
