@@ -30,37 +30,27 @@
       <h2>簽到</h2>
       <form id="checkin-form" class="card">
         <label>
-          選擇使用者（已簽到過的可直接選，會自動帶入據點）
-          <select id="checkin-user">
-            <option value="">-- 新使用者（請填下方姓名） --</option>
+          據點
+          <select id="checkin-location" required>
+            <option value="">-- 請選擇 --</option>
           </select>
         </label>
-        <label>
-          據點
-          <select id="checkin-location" required></select>
-        </label>
-        <label>
-          姓名
-          <input id="checkin-name" type="text" required maxlength="30" placeholder="輸入姓名">
-        </label>
-        <label>
-          日期
-          <input id="checkin-date" type="date" required>
-        </label>
+
+        <div id="checkin-attendees-wrap" class="hidden">
+          <h3 style="margin-top:16px">勾選出席學員</h3>
+          <p class="hint" id="checkin-attendees-hint"></p>
+          <div id="checkin-attendees-list" class="checkbox-list"></div>
+          <label>
+            新增其他學員（可選，多人請用逗號或換行分隔）
+            <textarea id="checkin-new-names" rows="2" placeholder="例如：王小明、李大華"></textarea>
+          </label>
+        </div>
+
         <div class="row">
           <button type="submit" class="primary">送出簽到</button>
           <button id="checkin-query-btn" type="button">簽到查詢</button>
         </div>
       </form>
-
-      <div class="card">
-        <h3>最近簽到紀錄</h3>
-        <p class="hint">先送出一次簽到，下方會列出該 (姓名 + 據點) 的最近 10 筆紀錄。</p>
-        <table id="checkin-table" class="data-table">
-          <thead><tr><th>日期</th><th>姓名</th><th>據點</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
 
       <div id="checkin-query-section" class="card hidden">
         <h3>查詢結果</h3>

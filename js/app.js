@@ -32,9 +32,11 @@ function showToast(msg, type) {
 }
 
 // 把目前的 locations 填到指定的 <select> 內
-async function populateLocationSelect(selectId) {
+// options: { placeholder: string }
+async function populateLocationSelect(selectId, options) {
   const el = document.getElementById(selectId);
   if (!el) return;
+  options = options || {};
   const previous = el.value;
   let locations = SettingsPage.getLocations();
   if (!locations || !locations.length) {
@@ -53,6 +55,12 @@ async function populateLocationSelect(selectId) {
     el.appendChild(opt);
     return;
   }
+  if (options.placeholder) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = options.placeholder;
+    el.appendChild(opt);
+  }
   locations.forEach(loc => {
     const opt = document.createElement('option');
     opt.value = loc.name;
@@ -64,7 +72,7 @@ async function populateLocationSelect(selectId) {
 
 // 設定頁新增/刪除據點後呼叫這個，更新所有分頁的下拉
 function refreshLocationSelects() {
-  populateLocationSelect('checkin-location');
+  populateLocationSelect('checkin-location', { placeholder: '-- 請選擇 --' });
 }
 
 // ========== 使用者清單快取 ==========
@@ -115,7 +123,6 @@ async function populateUserSelect(selectId, options) {
 // 有新增/刪除使用者時呼叫，重新載入並更新所有下拉
 async function refreshUserSelects() {
   await loadAllUsers(true);
-  populateUserSelect('checkin-user', { includeNewOption: true });
   populateUserSelect('weights-user');
   populateUserSelect('self-user');
 }
@@ -164,9 +171,8 @@ document.addEventListener('DOMContentLoaded', function () {
       SettingsPage.load(),
       loadAllUsers(true),
     ]).then(() => {
-      // 首頁是簽到頁，填入其下拉
-      populateLocationSelect('checkin-location');
-      populateUserSelect('checkin-user', { includeNewOption: true });
+      // 首頁是簽到頁，填入據點下拉
+      populateLocationSelect('checkin-location', { placeholder: '-- 請選擇 --' });
     }).catch(err => {
       showToast('載入資料失敗：' + err.message, 'error');
     });

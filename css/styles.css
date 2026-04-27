@@ -251,6 +251,78 @@ button:disabled {
   margin: 0 0 10px;
 }
 
+/* ===== 勾選列表（簽到頁） ===== */
+.checkbox-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.card .checkbox-list label.attendee-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 400;
+  color: var(--text);
+  transition: background .15s, border-color .15s;
+}
+
+.card .checkbox-list label.attendee-row:hover {
+  background: #f3f4f6;
+  border-color: #cbd5e1;
+}
+
+.card .checkbox-list label.attendee-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  cursor: pointer;
+  /* 放大一點，方便手機點擊 */
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.card .checkbox-list label.attendee-row span {
+  font-size: 15px;
+  flex: 1;
+}
+
+.card textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 12px;
+  font-size: 15px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  color: var(--text);
+  font-family: inherit;
+  resize: vertical;
+  min-height: 60px;
+}
+
+.card textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.15);
+}
+
+#toast {
+  white-space: pre-line;
+  text-align: left;
+  max-width: min(560px, 90vw);
+}
+
 /* ===== 手機 RWD ===== */
 @media (max-width: 560px) {
   .topbar h1 { font-size: 18px; }
