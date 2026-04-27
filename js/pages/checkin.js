@@ -22,7 +22,13 @@ const CheckinPage = (function () {
     e.preventDefault();
     const location = document.getElementById('checkin-location').value;
     const name = document.getElementById('checkin-name').value.trim();
-    const date = document.getElementById('checkin-date').value;
+    // 送出時強制重新取今天日期（避免頁面開了一晚日期還停在昨天）
+    const dateEl = document.getElementById('checkin-date');
+    const today = todayIso();
+    dateEl.value = today;
+    dateEl.min = today;
+    dateEl.max = today;
+    const date = today;
     if (!location) {
       showToast('請先到「設定」新增據點', 'error');
       return;
@@ -129,7 +135,13 @@ const CheckinPage = (function () {
     document.getElementById('checkin-form').addEventListener('submit', handleSubmit);
     document.getElementById('checkin-user').addEventListener('change', handleUserChange);
     document.getElementById('checkin-query-btn').addEventListener('click', handleQuery);
-    document.getElementById('checkin-date').value = todayIso();
+    // 鎖定日期欄位只能是今天，禁止補簽或預簽
+    const dateEl = document.getElementById('checkin-date');
+    const today = todayIso();
+    dateEl.value = today;
+    dateEl.min = today;
+    dateEl.max = today;
+    dateEl.readOnly = true;
   }
 
   return { init, load };

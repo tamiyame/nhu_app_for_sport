@@ -163,7 +163,10 @@ const actions = {
     const name = (req.name || '').trim();
     const location = (req.location || '').trim();
     if (!name || !location) throw new Error('姓名與據點皆必填');
-    const date = req.date ? req.date : toDateString(new Date());
+    const today = toDateString(new Date());
+    const date = req.date ? req.date : today;
+    // 僅限當日簽到，禁止補簽（過去）或預簽（未來）
+    if (date !== today) throw new Error('只能簽到當日，無法補簽或預簽');
     // 當日重複檢查：同一 (姓名, 據點, 日期) 已存在就拒絕
     const dup = readAll('check_ins').some(function (r) {
       return String(r.name) === name
