@@ -296,6 +296,54 @@ button:disabled {
   flex: 1;
 }
 
+/* 動態新增列（無 checkbox） */
+.card .checkbox-list .attendee-row.attendee-row--new {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  margin: 0;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: white;
+  user-select: none;
+  font-weight: 400;
+  color: var(--text);
+}
+
+.card .checkbox-list .attendee-row.attendee-row--new > span:first-child {
+  font-size: 15px;
+  flex: 1;
+}
+
+/* Inline 狀態文字（簽到結果直接顯示在每列後方） */
+.card .checkbox-list .attendee-row .row-status {
+  flex: 0 0 auto;
+  font-size: 13px;
+  max-width: 60%;
+  text-align: right;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.card .checkbox-list .attendee-row .row-status:empty {
+  display: none;
+}
+
+.card .checkbox-list .attendee-row .row-status.row-status--pending {
+  color: var(--muted);
+}
+
+.card .checkbox-list .attendee-row .row-status.row-status--success {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.card .checkbox-list .attendee-row .row-status.row-status--error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
 .card textarea {
   display: block;
   width: 100%;
@@ -321,6 +369,49 @@ button:disabled {
   white-space: pre-line;
   text-align: left;
   max-width: min(560px, 90vw);
+}
+
+/* ===== 學員清單 checkbox 欄 ===== */
+#settings-users-table th:first-child,
+#settings-users-table td:first-child {
+  width: 36px;
+  text-align: center;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+#settings-users-table tbody input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+/* ===== 檔案上傳 ===== */
+.card input[type="file"] {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px;
+  font-size: 14px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  background: #f9fafb;
+  color: var(--text);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.card input[type="file"]:hover {
+  border-color: var(--primary);
+  background: #f3f4f6;
+}
+
+#settings-xlsx-preview .data-table td:nth-child(3) {
+  color: var(--muted);
+  font-size: 13px;
+  word-break: break-all;
 }
 
 /* ===== 手機 RWD ===== */

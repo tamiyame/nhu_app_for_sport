@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>運動紀錄 APP</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=3">
 </head>
 <body>
 
@@ -14,6 +14,7 @@
       <button class="tab-btn active" data-tab="checkin">簽到</button>
       <button class="tab-btn" data-tab="weights">重訓紀錄</button>
       <button class="tab-btn" data-tab="self">自主訓練</button>
+      <button class="tab-btn" data-tab="googlefit">Google Fit</button>
       <button class="tab-btn" data-tab="settings">設定</button>
     </nav>
   </header>
@@ -48,18 +49,8 @@
 
         <div class="row">
           <button type="submit" class="primary">送出簽到</button>
-          <button id="checkin-query-btn" type="button">簽到查詢</button>
         </div>
       </form>
-
-      <div id="checkin-query-section" class="card hidden">
-        <h3>查詢結果</h3>
-        <p class="hint">姓名 <strong id="checkin-query-name-label"></strong> 的所有簽到紀錄（跨據點）</p>
-        <table id="checkin-query-table" class="data-table">
-          <thead><tr><th>日期</th><th>姓名</th><th>據點</th><th></th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
     </section>
 
     <!-- ===== 重訓頁 ===== -->
@@ -174,25 +165,121 @@
       </div>
     </section>
 
+    <!-- ===== Google Fit 頁 ===== -->
+    <section id="tab-googlefit" class="tab-panel">
+      <h2>Google Fit</h2>
+
+      <div class="card">
+        <p class="hint">
+          透過 OAuth 安全地讀取您 Google 帳號上的 Google Fit 體能活動資料（步數、運動分鐘等）。
+          資料只在瀏覽器內讀取與顯示，不會自動上傳到後端；如需保存，可使用下方「寫入自主訓練」按鈕。
+        </p>
+        <div id="gfit-config-warning" class="warning hidden" style="margin:0 0 12px;border-radius:6px;border:1px solid #fde68a">
+          尚未設定 Google Fit Client ID，請編輯 <code>js/config.js</code>。
+        </div>
+        <div id="gfit-auth-section">
+          <button id="gfit-signin-btn" type="button" class="primary">登入 Google</button>
+          <span id="gfit-account-label" class="hint" style="margin-left:12px"></span>
+          <button id="gfit-signout-btn" type="button" class="hidden" style="margin-left:12px">登出</button>
+        </div>
+      </div>
+
+      <div id="gfit-data-section" class="hidden">
+        <div class="card">
+          <h3>近 7 天步數</h3>
+          <p class="hint" id="gfit-week-summary"></p>
+          <table id="gfit-week-table" class="data-table">
+            <thead><tr><th>日期</th><th>步數</th><th>運動時間（分鐘）</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <form id="gfit-write-form" class="card">
+          <h3>寫入自主訓練</h3>
+          <p class="hint">把今日（或最近一天）的步數與運動分鐘寫入指定學員的自主訓練紀錄。</p>
+          <div class="row">
+            <label>
+              學員
+              <select id="gfit-write-user" required>
+                <option value="">-- 請選擇 --</option>
+              </select>
+            </label>
+            <label>
+              日期
+              <select id="gfit-write-day" required>
+                <option value="">-- 請選擇 --</option>
+              </select>
+            </label>
+          </div>
+          <button type="submit" class="primary">寫入</button>
+        </form>
+      </div>
+    </section>
+
     <!-- ===== 設定頁 ===== -->
     <section id="tab-settings" class="tab-panel">
       <h2>設定</h2>
 
       <form id="settings-form" class="card">
-        <h3>新增據點</h3>
-        <label>
-          據點名稱
-          <input id="settings-new-location" type="text" required maxlength="30" placeholder="例如：台北館">
-        </label>
-        <button type="submit" class="primary">新增</button>
+        <h3>新增學員</h3>
+        <div class="row">
+          <label>
+            據點
+            <select id="settings-location" required>
+              <option value="">-- 請選擇 --</option>
+            </select>
+          </label>
+          <label>
+            姓名
+            <input id="settings-new-user" type="text" required maxlength="30" placeholder="例如：王小明">
+          </label>
+        </div>
+        <button type="submit" class="primary">新增學員</button>
       </form>
 
       <div class="card">
-        <h3>所有據點</h3>
-        <table id="settings-table" class="data-table">
-          <thead><tr><th>據點</th><th></th></tr></thead>
+        <h3>學員清單</h3>
+        <p class="hint">先在上方選擇據點，下表會列出該據點所有學員，勾選後可批次刪除（過去簽到紀錄會保留）。</p>
+        <div class="row hidden" id="settings-users-actions" style="margin-bottom:12px">
+          <button id="settings-users-select-all" type="button">全選</button>
+          <button id="settings-users-select-none" type="button">全不選</button>
+          <button id="settings-users-delete" type="button" class="danger">刪除</button>
+        </div>
+        <table id="settings-users-table" class="data-table">
+          <thead><tr><th></th><th>姓名</th></tr></thead>
           <tbody></tbody>
         </table>
+      </div>
+
+      <div class="card">
+        <h3>批次匯入名單（.xlsx）</h3>
+        <p class="hint">每個分頁名稱代表一個據點，A 欄第 1 列為「姓名」表頭，第 2 列起為學員姓名。</p>
+        <input type="file" id="settings-xlsx-file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+        <div id="settings-xlsx-preview" class="hidden" style="margin-top:12px">
+          <table class="data-table">
+            <thead><tr><th>據點</th><th>人數</th><th>姓名</th></tr></thead>
+            <tbody id="settings-xlsx-preview-body"></tbody>
+          </table>
+          <div class="row" style="margin-top:12px">
+            <button id="settings-xlsx-merge" type="button" class="primary">合併匯入（保留現有學員）</button>
+            <button id="settings-xlsx-replace" type="button" class="danger">覆蓋匯入（清空後重建）</button>
+            <button id="settings-xlsx-cancel" type="button">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>所有據點</h3>
+        <p class="hint">據點透過上方批次匯入自動建立。如需刪除某個據點，從下方選取後按「刪除據點」，該據點底下的學員清單會一併移除（簽到/訓練的歷史紀錄會保留）。</p>
+        <div class="row">
+          <label>
+            據點
+            <select id="settings-locations-select">
+              <option value="">-- 請選擇 --</option>
+            </select>
+          </label>
+        </div>
+        <button id="settings-delete-location-btn" type="button" class="danger">刪除據點</button>
       </div>
 
       <div class="card">
@@ -207,13 +294,19 @@
 
   <div id="toast"></div>
 
+  <!-- xlsx 解析（SheetJS） -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Google Identity Services（Google Fit OAuth） -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <!-- JS 載入順序：config → api → pages → app -->
   <script src="js/config.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/pages/settings.js"></script>
-  <script src="js/pages/checkin.js"></script>
+  <script src="js/api.js?v=4"></script>
+  <script src="js/pages/settings.js?v=5"></script>
+  <script src="js/pages/checkin.js?v=4"></script>
   <script src="js/pages/weights.js"></script>
   <script src="js/pages/self.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/pages/googlefit.js?v=2"></script>
+  <script src="js/app.js?v=2"></script>
 </body>
 </html>

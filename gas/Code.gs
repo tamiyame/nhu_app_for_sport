@@ -127,6 +127,109 @@ const actions = {
       });
   },
 
+  // 手動新增單一學員：idempotent，已存在則不報錯，回傳 created 旗標
+  addUser: function (req) {
+    const name = (req.name || '').trim();
+    const location = (req.location || '').trim();
+    if (!name || !location) throw new Error('姓名與據點皆必填');
+    const locs = readAll('locations');
+    if (!locs.some(function (l) { return String(l.name) === location; })) {
+      throw new Error('據點不存在：' + location);
+    }
+    const exists = readAll('users').some(function (u) {
+      return String(u.name) === name && String(u.location) === location;
+    });
+    if (!exists) {
+      sheet('users').appendRow([name, location, new Date()]);
+    }
+    return { name: name, location: location, created: !exists };
+  },
+
+  // 刪除單一學員：僅從 users 表移除，保留歷史簽到/訓練紀錄
+  deleteUser: function (req) {
+    const name = String(req.name || '').trim();
+    const location = String(req.location || '').trim();
+    if (!name || !location) throw new Error('姓名與據點皆必填');
+    const sh = sheet('users');
+    const data = sh.getDataRange().getValues();
+    let deleted = 0;
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][0]) === name && String(data[i][1]) === location) {
+        sh.deleteRow(i + 1);
+        deleted++;
+      }
+    }
+    if (!deleted) throw new Error('找不到學員：' + name + ' @ ' + location);
+    return { name: name, location: location, deleted: deleted };
+  },
+
+  // 批次匯入：items = [{location, name}, ...]
+  // mode = 'merge'（預設，僅補上不存在的）或 'replace'（先清空 items 涉及的據點，再寫入）
+  bulkImport: function (req) {
+    const rawItems = Array.isArray(req.items) ? req.items : [];
+    const mode = req.mode === 'replace' ? 'replace' : 'merge';
+    const cleaned = [];
+    rawItems.forEach(function (it) {
+      const name = String((it && it.name) || '').trim();
+      const loc  = String((it && it.location) || '').trim();
+      if (name && loc) cleaned.push({ name: name, location: loc });
+    });
+    if (!cleaned.length) throw new Error('沒有有效的姓名/據點資料');
+    // 找出涉及的據點
+    const locSet = {};
+    cleaned.forEach(function (it) { locSet[it.location] = true; });
+    const locList = Object.keys(locSet);
+    // 自動補上缺少的據點
+    const existingLocs = readAll('locations').map(function (l) { return String(l.name); });
+    let locationsAdded = 0;
+    locList.forEach(function (loc) {
+      if (existingLocs.indexOf(loc) === -1) {
+        sheet('locations').appendRow([loc, new Date()]);
+        existingLocs.push(loc);
+        locationsAdded++;
+      }
+    });
+    // replace 模式：先清空這些據點現有學員
+    let usersDeleted = 0;
+    if (mode === 'replace') {
+      const ush = sheet('users');
+      const udata = ush.getDataRange().getValues();
+      for (let i = udata.length - 1; i >= 1; i--) {
+        if (locList.indexOf(String(udata[i][1])) !== -1) {
+          ush.deleteRow(i + 1);
+          usersDeleted++;
+        }
+      }
+    }
+    // upsert 學員（去重後再對照已存在者）
+    const existingKeys = readAll('users').map(function (u) {
+      return String(u.name) + '|' + String(u.location);
+    });
+    const seen = {};
+    let usersAdded = 0;
+    let usersSkipped = 0;
+    cleaned.forEach(function (it) {
+      const key = it.name + '|' + it.location;
+      if (seen[key]) return;
+      seen[key] = true;
+      if (existingKeys.indexOf(key) !== -1) {
+        usersSkipped++;
+      } else {
+        sheet('users').appendRow([it.name, it.location, new Date()]);
+        existingKeys.push(key);
+        usersAdded++;
+      }
+    });
+    return {
+      mode: mode,
+      locationsAdded: locationsAdded,
+      locationsTouched: locList.length,
+      usersAdded: usersAdded,
+      usersSkipped: usersSkipped,
+      usersDeleted: usersDeleted
+    };
+  },
+
   addLocation: function (req) {
     const name = (req.name || '').trim();
     if (!name) throw new Error('據點名稱不可空白');
@@ -138,24 +241,33 @@ const actions = {
     return { name: name };
   },
 
+  // 刪除據點並連動刪除其底下所有學員（users 表）；簽到/訓練歷史紀錄保留
   deleteLocation: function (req) {
-    const name = String(req.name || '');
+    const name = String(req.name || '').trim();
     if (!name) throw new Error('據點名稱不可空白');
-    const users = readAll('users');
-    if (users.some(u => String(u.location) === name)) {
-      throw new Error('此據點仍有使用者紀錄，無法刪除');
+    const locsRows = readAll('locations');
+    if (!locsRows.some(function (l) { return String(l.name) === name; })) {
+      throw new Error('找不到據點：' + name);
     }
+    // 先連動刪除該據點的學員
+    const ush = sheet('users');
+    const udata = ush.getDataRange().getValues();
+    let usersDeleted = 0;
+    for (let i = udata.length - 1; i >= 1; i--) {
+      if (String(udata[i][1]) === name) {
+        ush.deleteRow(i + 1);
+        usersDeleted++;
+      }
+    }
+    // 再刪除據點本身
     const sh = sheet('locations');
     const data = sh.getDataRange().getValues();
-    let deleted = false;
     for (let i = data.length - 1; i >= 1; i--) {
       if (String(data[i][0]) === name) {
         sh.deleteRow(i + 1);
-        deleted = true;
       }
     }
-    if (!deleted) throw new Error('找不到據點：' + name);
-    return { name: name };
+    return { name: name, usersDeleted: usersDeleted };
   },
 
   // ---- check-in ----
@@ -189,6 +301,20 @@ const actions = {
       .map(r => ({ id: r.id, name: r.name, location: r.location, check_date: toDateString(r.check_date) }))
       .sort((a, b) => (a.check_date < b.check_date ? 1 : -1));
     return limit > 0 ? rows.slice(0, limit) : rows;
+  },
+
+  // 依據點查詢某日的簽到紀錄（date 預設為今天）
+  listCheckInsByLocation: function (req) {
+    const location = String(req.location || '').trim();
+    if (!location) throw new Error('據點必填');
+    const date = req.date ? String(req.date) : toDateString(new Date());
+    return readAll('check_ins')
+      .filter(function (r) {
+        return String(r.location) === location && toDateString(r.check_date) === date;
+      })
+      .map(function (r) {
+        return { id: r.id, name: r.name, location: r.location, check_date: toDateString(r.check_date) };
+      });
   },
 
   // 僅依姓名查詢所有簽到紀錄（跨據點）

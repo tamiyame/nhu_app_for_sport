@@ -130,10 +130,11 @@ async function refreshUserSelects() {
 // ===== 分頁切換 =====
 
 const PAGE_LOADERS = {
-  checkin:  () => CheckinPage.load(),
-  weights:  () => WeightsPage.load(),
-  self:     () => SelfPage.load(),
-  settings: () => SettingsPage.load(),
+  checkin:   () => CheckinPage.load(),
+  weights:   () => WeightsPage.load(),
+  self:      () => SelfPage.load(),
+  googlefit: () => GoogleFitPage.load(),
+  settings:  () => SettingsPage.load(),
 };
 
 function switchTab(tabName) {
@@ -159,6 +160,7 @@ document.addEventListener('DOMContentLoaded', function () {
   CheckinPage.init();
   WeightsPage.init();
   SelfPage.init();
+  GoogleFitPage.init();
 
   // 分頁 nav 事件
   document.querySelectorAll('.tab-btn').forEach(btn => {

@@ -44,12 +44,14 @@ const Api = {
 
   // users
   listUsers:          ()       => callApi('listUsers'),
+  addUser:            (p)      => callApi('addUser', p),
+  deleteUser:         (p)      => callApi('deleteUser', p),
+  bulkImport:         (p)      => callApi('bulkImport', p),
 
   // check-in
-  checkIn:            (p)      => callApi('checkIn', p),
-  listCheckIns:       (p)      => callApi('listCheckIns', p),
-  listCheckInsByName: (name)   => callApi('listCheckInsByName', { name }),
-  deleteCheckIn:      (id)     => callApi('deleteCheckIn', { id }),
+  checkIn:                  (p) => callApi('checkIn', p),
+  listCheckIns:             (p) => callApi('listCheckIns', p),
+  listCheckInsByLocation:   (p) => callApi('listCheckInsByLocation', p),
 
   // weight training
   addWeightRecord:    (p)      => callApi('addWeightRecord', p),
