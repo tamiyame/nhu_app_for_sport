@@ -18,7 +18,7 @@ const HEADERS = {
   users:           ['name', 'location', 'created_at'],
   check_ins:       ['id', 'name', 'location', 'check_date', 'created_at'],
   weight_training: ['id', 'name', 'location', 'train_date', 'action_type', 'weight_kg', 'reps', 'sets', 'created_at'],
-  self_training:   ['id', 'name', 'location', 'train_date', 'daily_steps', 'weekly_steps', 'weekly_exercise_minutes', 'created_at'],
+  self_training:   ['id', 'name', 'location', 'train_date', 'daily_steps', 'weekly_steps', 'weekly_exercise_minutes', 'perceived_exertion', 'exercise_type', 'video_view_count', 'created_at'],
 };
 
 // ===== 進入點 =====
@@ -53,12 +53,34 @@ function sheet(name) {
     sh.appendRow(HEADERS[name]);
     sh.getRange(1, 1, 1, HEADERS[name].length).setFontWeight('bold');
     sh.setFrozenRows(1);
-  } else if (sh.getLastRow() === 0) {
+    return sh;
+  }
+  if (sh.getLastRow() === 0) {
     sh.appendRow(HEADERS[name]);
     sh.getRange(1, 1, 1, HEADERS[name].length).setFontWeight('bold');
     sh.setFrozenRows(1);
+    return sh;
+  }
+  // 欄位遷移：若 HEADERS 新增了欄位，補在最右邊（既有資料保留，新欄位顯示空白）
+  const expected = HEADERS[name];
+  if (expected) {
+    const lastCol = sh.getLastColumn();
+    const existing = sh.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
+    const missing = expected.filter(function (h) { return existing.indexOf(h) === -1; });
+    if (missing.length) {
+      sh.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]).setFontWeight('bold');
+    }
   }
   return sh;
+}
+
+// 依目前試算表的欄位標題，把 obj[header] 對應寫入；標題不存在的欄位以空字串填入。
+// 用來避免欄位順序變動造成寫錯欄位（搭配 sheet() 的遷移邏輯）。
+function appendByHeader(name, obj) {
+  const sh = sheet(name);
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(String);
+  const row = headers.map(function (h) { return obj[h] !== undefined ? obj[h] : ''; });
+  sh.appendRow(row);
 }
 
 function readAll(name) {
@@ -364,7 +386,11 @@ const actions = {
     const name = String(req.name || '');
     const location = String(req.location || '');
     return readAll('weight_training')
-      .filter(r => String(r.name) === name && String(r.location) === location)
+      .filter(function (r) {
+        if (name && String(r.name) !== name) return false;
+        if (location && String(r.location) !== location) return false;
+        return true;
+      })
       .map(r => ({
         id: r.id,
         name: r.name,
@@ -389,16 +415,19 @@ const actions = {
     if (!name || !location) throw new Error('姓名與據點皆必填');
     upsertUser(name, location);
     const id = uuid();
-    sheet('self_training').appendRow([
-      id,
-      name,
-      location,
-      req.train_date || toDateString(new Date()),
-      Number(req.daily_steps || 0),
-      Number(req.weekly_steps || 0),
-      Number(req.weekly_exercise_minutes || 0),
-      new Date()
-    ]);
+    appendByHeader('self_training', {
+      id: id,
+      name: name,
+      location: location,
+      train_date: req.train_date || toDateString(new Date()),
+      daily_steps: Number(req.daily_steps || 0),
+      weekly_steps: Number(req.weekly_steps || 0),
+      weekly_exercise_minutes: Number(req.weekly_exercise_minutes || 0),
+      perceived_exertion: req.perceived_exertion === undefined || req.perceived_exertion === '' ? '' : Number(req.perceived_exertion),
+      exercise_type: String(req.exercise_type || ''),
+      video_view_count: req.video_view_count === undefined || req.video_view_count === '' ? '' : Number(req.video_view_count),
+      created_at: new Date()
+    });
     return { id: id };
   },
 
@@ -406,7 +435,11 @@ const actions = {
     const name = String(req.name || '');
     const location = String(req.location || '');
     return readAll('self_training')
-      .filter(r => String(r.name) === name && String(r.location) === location)
+      .filter(function (r) {
+        if (name && String(r.name) !== name) return false;
+        if (location && String(r.location) !== location) return false;
+        return true;
+      })
       .map(r => ({
         id: r.id,
         name: r.name,
@@ -415,6 +448,9 @@ const actions = {
         daily_steps: Number(r.daily_steps),
         weekly_steps: Number(r.weekly_steps),
         weekly_exercise_minutes: Number(r.weekly_exercise_minutes),
+        perceived_exertion: r.perceived_exertion === '' || r.perceived_exertion == null ? '' : Number(r.perceived_exertion),
+        exercise_type: r.exercise_type == null ? '' : String(r.exercise_type),
+        video_view_count: r.video_view_count === '' || r.video_view_count == null ? '' : Number(r.video_view_count),
       }))
       .sort((a, b) => (a.train_date < b.train_date ? 1 : -1));
   },

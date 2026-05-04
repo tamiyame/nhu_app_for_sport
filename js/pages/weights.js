@@ -12,6 +12,29 @@ const WeightsPage = (function () {
   let usersAtLocation = [];
   let currentName = '';
   let currentLocation = '';
+  // 紀錄快取：{ [location]: Promise<rows[]> }
+  // 選據點時就背景開始 fetch；點學員時直接從快取過濾，秒出。
+  const recordsCache = {};
+  // 只要看到任何一筆只丟 location 就回傳資料的成功例，就確定後端已支援
+  // location-only 模式（新版 GAS）。確認前用 per-name fallback 避免破畫面。
+  let locationOnlyVerified = false;
+
+  function prefetchRecords(location) {
+    if (!location) return null;
+    if (!recordsCache[location]) {
+      recordsCache[location] = Api.listWeightRecords({ location: location })
+        .then(rows => {
+          if (Array.isArray(rows) && rows.length > 0) locationOnlyVerified = true;
+          return rows;
+        })
+        .catch(err => { delete recordsCache[location]; throw err; });
+    }
+    return recordsCache[location];
+  }
+
+  function invalidateRecords(location) {
+    if (location) delete recordsCache[location];
+  }
 
   async function load() {
     await populateLocationSelect('weights-location', { placeholder: '-- 請選擇 --' });
@@ -48,6 +71,8 @@ const WeightsPage = (function () {
         .sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-Hant'));
       renderAttendeeList();
       wrap.classList.remove('hidden');
+      // 背景啟動該據點全部紀錄的 prefetch；學員選定後直接過濾 cache
+      prefetchRecords(location);
     } catch (err) {
       showToast('載入學員失敗：' + err.message, 'error');
     }
@@ -114,6 +139,9 @@ const WeightsPage = (function () {
       await Api.addWeightRecord(payload);
       showToast('已新增重訓紀錄', 'success');
       document.getElementById('weights-action').value = '';
+      // 紀錄已變更：作廢該據點快取，並在背景重新 prefetch；refreshList 會 await 新 Promise
+      invalidateRecords(currentLocation);
+      prefetchRecords(currentLocation);
       await refreshList();
     } catch (err) {
       showToast(err.message, 'error');
@@ -123,8 +151,20 @@ const WeightsPage = (function () {
   async function refreshList() {
     if (!currentName || !currentLocation) return;
     const tbody = document.querySelector('#weights-table tbody');
+    const reqName = currentName;
+    const reqLocation = currentLocation;
     try {
-      const rows = await Api.listWeightRecords({ name: currentName, location: currentLocation });
+      // 從據點快取過濾；快取若已落地則秒出，否則 await 同一個背景 Promise。
+      const allRows = await prefetchRecords(reqLocation);
+      // 期間若使用者已切換到別的學員/據點就不要覆蓋畫面
+      if (reqName !== currentName || reqLocation !== currentLocation) return;
+      let rows = allRows.filter(r => String(r.name) === reqName);
+      // 後端尚未確認支援 location-only（如尚未重新部署）時，若 cache 為空就以
+      // per-name 模式 fallback 一次，確保畫面不會誤顯示為「尚無紀錄」。
+      if (!locationOnlyVerified && allRows.length === 0) {
+        rows = await Api.listWeightRecords({ name: reqName, location: reqLocation });
+        if (reqName !== currentName || reqLocation !== currentLocation) return;
+      }
       tbody.innerHTML = '';
       if (!rows.length) {
         tbody.innerHTML = '<tr class="empty-row"><td colspan="6">尚無紀錄</td></tr>';
@@ -156,6 +196,8 @@ const WeightsPage = (function () {
     try {
       await Api.deleteWeightRecord(id);
       showToast('已刪除', 'success');
+      invalidateRecords(currentLocation);
+      prefetchRecords(currentLocation);
       await refreshList();
     } catch (err) {
       showToast(err.message, 'error');

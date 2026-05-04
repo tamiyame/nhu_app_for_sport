@@ -11,6 +11,27 @@ const SelfPage = (function () {
   let usersAtLocation = [];
   let currentName = '';
   let currentLocation = '';
+  const VIDEO_VIEW_OPTIONS = [0, 1, 2];
+  // 紀錄快取：{ [location]: Promise<rows[]> }
+  const recordsCache = {};
+  let locationOnlyVerified = false;
+
+  function prefetchRecords(location) {
+    if (!location) return null;
+    if (!recordsCache[location]) {
+      recordsCache[location] = Api.listSelfRecords({ location: location })
+        .then(rows => {
+          if (Array.isArray(rows) && rows.length > 0) locationOnlyVerified = true;
+          return rows;
+        })
+        .catch(err => { delete recordsCache[location]; throw err; });
+    }
+    return recordsCache[location];
+  }
+
+  function invalidateRecords(location) {
+    if (location) delete recordsCache[location];
+  }
 
   async function load() {
     await populateLocationSelect('self-location', { placeholder: '-- 請選擇 --' });
@@ -26,7 +47,46 @@ const SelfPage = (function () {
 
   function clearTable() {
     const tbody = document.querySelector('#self-table tbody');
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">尚無紀錄</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="8">尚無紀錄</td></tr>';
+  }
+
+  function renderVideoViewOptions() {
+    const list = document.getElementById('self-video-views');
+    list.innerHTML = '';
+    VIDEO_VIEW_OPTIONS.forEach(function (v, idx) {
+      const id = 'self-video-view-' + idx;
+      const wrapper = document.createElement('label');
+      wrapper.className = 'attendee-row';
+      wrapper.setAttribute('for', id);
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = id;
+      cb.dataset.value = String(v);
+      cb.addEventListener('change', function () { handleVideoViewChange(cb); });
+      const span = document.createElement('span');
+      span.textContent = String(v) + ' 次';
+      wrapper.appendChild(cb);
+      wrapper.appendChild(span);
+      list.appendChild(wrapper);
+    });
+  }
+
+  function handleVideoViewChange(changedCb) {
+    if (!changedCb.checked) return;
+    document.querySelectorAll('#self-video-views input[type=checkbox]').forEach(function (other) {
+      if (other !== changedCb) other.checked = false;
+    });
+  }
+
+  function resetFormFields() {
+    document.getElementById('self-daily-steps').value = '';
+    document.getElementById('self-weekly-steps').value = '';
+    document.getElementById('self-weekly-min').value = '';
+    document.getElementById('self-rpe').value = '';
+    document.getElementById('self-exercise-type').value = '';
+    document.querySelectorAll('#self-video-views input[type=checkbox]').forEach(function (cb) {
+      cb.checked = false;
+    });
   }
 
   async function handleLocationChange() {
@@ -47,6 +107,8 @@ const SelfPage = (function () {
         .sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-Hant'));
       renderAttendeeList();
       wrap.classList.remove('hidden');
+      // 背景啟動該據點全部紀錄的 prefetch
+      prefetchRecords(location);
     } catch (err) {
       showToast('載入學員失敗：' + err.message, 'error');
     }
@@ -101,16 +163,24 @@ const SelfPage = (function () {
       showToast('請先選擇據點與學員', 'error');
       return;
     }
+    const rpeRaw = document.getElementById('self-rpe').value;
+    const videoCb = document.querySelector('#self-video-views input[type=checkbox]:checked');
     const payload = {
       name: currentName,
       location: currentLocation,
       daily_steps: Number(document.getElementById('self-daily-steps').value || 0),
       weekly_steps: Number(document.getElementById('self-weekly-steps').value || 0),
       weekly_exercise_minutes: Number(document.getElementById('self-weekly-min').value || 0),
+      perceived_exertion: rpeRaw === '' ? '' : Number(rpeRaw),
+      exercise_type: document.getElementById('self-exercise-type').value.trim(),
+      video_view_count: videoCb ? Number(videoCb.dataset.value) : '',
     };
     try {
       await Api.addSelfRecord(payload);
       showToast('已新增自主訓練紀錄', 'success');
+      resetFormFields();
+      invalidateRecords(currentLocation);
+      prefetchRecords(currentLocation);
       await refreshList();
     } catch (err) {
       showToast(err.message, 'error');
@@ -120,11 +190,19 @@ const SelfPage = (function () {
   async function refreshList() {
     if (!currentName || !currentLocation) return;
     const tbody = document.querySelector('#self-table tbody');
+    const reqName = currentName;
+    const reqLocation = currentLocation;
     try {
-      const rows = await Api.listSelfRecords({ name: currentName, location: currentLocation });
+      const allRows = await prefetchRecords(reqLocation);
+      if (reqName !== currentName || reqLocation !== currentLocation) return;
+      let rows = allRows.filter(r => String(r.name) === reqName);
+      if (!locationOnlyVerified && allRows.length === 0) {
+        rows = await Api.listSelfRecords({ name: reqName, location: reqLocation });
+        if (reqName !== currentName || reqLocation !== currentLocation) return;
+      }
       tbody.innerHTML = '';
       if (!rows.length) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="5">尚無紀錄</td></tr>';
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="8">尚無紀錄</td></tr>';
         return;
       }
       rows.forEach(r => {
@@ -134,6 +212,9 @@ const SelfPage = (function () {
           '<td>' + r.daily_steps + '</td>' +
           '<td>' + r.weekly_steps + '</td>' +
           '<td>' + r.weekly_exercise_minutes + '</td>' +
+          '<td>' + (r.perceived_exertion === '' || r.perceived_exertion == null ? '' : r.perceived_exertion) + '</td>' +
+          '<td>' + escapeHtml(r.exercise_type || '') + '</td>' +
+          '<td>' + (r.video_view_count === '' || r.video_view_count == null ? '' : r.video_view_count) + '</td>' +
           '<td style="text-align:right"></td>';
         const delBtn = document.createElement('button');
         delBtn.className = 'danger';
@@ -152,6 +233,8 @@ const SelfPage = (function () {
     try {
       await Api.deleteSelfRecord(id);
       showToast('已刪除', 'success');
+      invalidateRecords(currentLocation);
+      prefetchRecords(currentLocation);
       await refreshList();
     } catch (err) {
       showToast(err.message, 'error');
@@ -161,6 +244,7 @@ const SelfPage = (function () {
   function init() {
     document.getElementById('self-form').addEventListener('submit', handleSubmit);
     document.getElementById('self-location').addEventListener('change', handleLocationChange);
+    renderVideoViewOptions();
   }
 
   return { init, load };

@@ -143,6 +143,24 @@
             <input id="self-weekly-min" type="number" min="0" step="1" placeholder="例如 210">
           </label>
         </div>
+        <div class="row">
+          <label>
+            自覺運動強度 (1–10)
+            <select id="self-rpe">
+              <option value="">-- 請選擇 --</option>
+              <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+              <option>6</option><option>7</option><option>8</option><option>9</option><option>10</option>
+            </select>
+          </label>
+          <label>
+            運動項目
+            <input id="self-exercise-type" type="text" maxlength="40" placeholder="例如：散步、慢跑、瑜珈">
+          </label>
+        </div>
+        <label>
+          影片觀看次數（單選）
+        </label>
+        <div id="self-video-views" class="checkbox-list"></div>
         <button type="submit" class="primary">新增紀錄</button>
       </form>
 
@@ -151,7 +169,8 @@
         <table id="self-table" class="data-table">
           <thead>
             <tr>
-              <th>日期</th><th>每日步數</th><th>每週步數</th><th>每週分鐘</th><th></th>
+              <th>日期</th><th>每日步數</th><th>每週步數</th><th>每週分鐘</th>
+              <th>強度</th><th>項目</th><th>影片次數</th><th></th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -298,8 +317,8 @@
   <script src="js/api.js?v=4"></script>
   <script src="js/pages/settings.js?v=5"></script>
   <script src="js/pages/checkin.js?v=5"></script>
-  <script src="js/pages/weights.js?v=2"></script>
-  <script src="js/pages/self.js?v=3"></script>
+  <script src="js/pages/weights.js?v=3"></script>
+  <script src="js/pages/self.js?v=5"></script>
   <script src="js/pages/googlefit.js?v=2"></script>
   <script src="js/app.js?v=2"></script>
 </body>
