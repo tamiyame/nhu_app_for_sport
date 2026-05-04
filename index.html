@@ -59,24 +59,21 @@
 
       <div class="card">
         <h3>選擇使用者</h3>
-        <div class="row">
-          <label>
-            使用者
-            <select id="weights-user" required>
-              <option value="">-- 請選擇 --</option>
-            </select>
-          </label>
-          <button id="weights-load" type="button">載入紀錄</button>
+        <label>
+          據點
+          <select id="weights-location" required>
+            <option value="">-- 請選擇 --</option>
+          </select>
+        </label>
+        <div id="weights-attendees-wrap" class="hidden">
+          <p class="hint" id="weights-attendees-hint"></p>
+          <div id="weights-attendees-list" class="checkbox-list"></div>
         </div>
-        <p class="hint">找不到？請先到「簽到」頁完成一次簽到。</p>
+        <p class="hint">找不到學員？請到「設定」頁新增，或到「簽到」頁完成一次簽到。</p>
       </div>
 
       <form id="weights-form" class="card">
         <h3>新增一筆重訓</h3>
-        <label>
-          日期
-          <input id="weights-date" type="date" required>
-        </label>
         <label>
           動作類型
           <input id="weights-action" type="text" required maxlength="40" placeholder="例如：臥推、深蹲、硬舉">
@@ -303,8 +300,8 @@
   <script src="js/config.js"></script>
   <script src="js/api.js?v=4"></script>
   <script src="js/pages/settings.js?v=5"></script>
-  <script src="js/pages/checkin.js?v=4"></script>
-  <script src="js/pages/weights.js"></script>
+  <script src="js/pages/checkin.js?v=5"></script>
+  <script src="js/pages/weights.js?v=2"></script>
   <script src="js/pages/self.js"></script>
   <script src="js/pages/googlefit.js?v=2"></script>
   <script src="js/app.js?v=2"></script>

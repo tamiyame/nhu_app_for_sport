@@ -10,6 +10,7 @@
 const CheckinPage = (function () {
 
   let usersAtLocation = [];
+  let currentLocationToken = 0;
 
   async function load() {
     await populateLocationSelect('checkin-location', { placeholder: '-- 請選擇 --' });
@@ -18,6 +19,8 @@ const CheckinPage = (function () {
     wrap.classList.add('hidden');
     document.getElementById('checkin-attendees-list').innerHTML = '';
     document.getElementById('checkin-new-names').value = '';
+    // 進分頁時在背景刷新一次學員快取，讓之後選據點時可直接用快取秒出
+    loadAllUsers(true).catch(() => {});
   }
 
   // 據點變動 → 載入該據點的學員清單，並標出今天已簽到者
@@ -29,16 +32,22 @@ const CheckinPage = (function () {
       return;
     }
     try {
-      const [_, todayRows] = await Promise.all([
-        loadAllUsers(true),
-        Api.listCheckInsByLocation({ location, date: todayIso() }).catch(() => [])
-      ]);
+      // 先用快取秒出學員清單（不阻塞 UI），再背景拿今天已簽到名單回來補狀態
+      await loadAllUsers();
       usersAtLocation = cachedUsers
         .filter(u => String(u.location) === location)
         .sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-Hant'));
-      const todaySet = new Set((todayRows || []).map(r => String(r.name)));
-      renderAttendeeList(todaySet);
+      renderAttendeeList(new Set());
       wrap.classList.remove('hidden');
+      // 用 token 避免使用者快速切換據點時舊請求蓋掉新清單
+      const token = ++currentLocationToken;
+      Api.listCheckInsByLocation({ location, date: todayIso() })
+        .then(rows => {
+          if (token !== currentLocationToken) return;
+          const todaySet = new Set((rows || []).map(r => String(r.name)));
+          renderAttendeeList(todaySet);
+        })
+        .catch(() => {});
     } catch (err) {
       showToast('載入學員失敗：' + err.message, 'error');
     }

@@ -73,6 +73,7 @@ async function populateLocationSelect(selectId, options) {
 // 設定頁新增/刪除據點後呼叫這個，更新所有分頁的下拉
 function refreshLocationSelects() {
   populateLocationSelect('checkin-location', { placeholder: '-- 請選擇 --' });
+  populateLocationSelect('weights-location', { placeholder: '-- 請選擇 --' });
 }
 
 // ========== 使用者清單快取 ==========
@@ -123,7 +124,6 @@ async function populateUserSelect(selectId, options) {
 // 有新增/刪除使用者時呼叫，重新載入並更新所有下拉
 async function refreshUserSelects() {
   await loadAllUsers(true);
-  populateUserSelect('weights-user');
   populateUserSelect('self-user');
 }
 
