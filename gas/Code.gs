@@ -19,6 +19,7 @@ const HEADERS = {
   check_ins:       ['id', 'name', 'location', 'check_date', 'created_at'],
   weight_training: ['id', 'name', 'location', 'train_date', 'action_type', 'weight_kg', 'reps', 'sets', 'created_at'],
   self_training:   ['id', 'name', 'location', 'train_date', 'daily_steps', 'weekly_steps', 'weekly_exercise_minutes', 'perceived_exertion', 'exercise_type', 'video_view_count', 'created_at'],
+  email_bindings:  ['email', 'name', 'location', 'created_at'],
 };
 
 // ===== 進入點 =====
@@ -457,6 +458,54 @@ const actions = {
 
   deleteSelfRecord: function (req) {
     return deleteRowById('self_training', req.id);
+  },
+
+  // ---- email <-> user binding (Google Fit 綁定學員) ----
+  // upsert by email: 同一個 email 只有一筆綁定，重綁覆寫
+  bindEmail: function (req) {
+    const email = String(req.email || '').trim().toLowerCase();
+    const name = String(req.name || '').trim();
+    const location = String(req.location || '').trim();
+    if (!email) throw new Error('email 必填');
+    if (!name || !location) throw new Error('學員姓名與據點皆必填');
+    const sh = sheet('email_bindings');
+    const data = sh.getDataRange().getValues();
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][0]).toLowerCase() === email) {
+        sh.deleteRow(i + 1);
+      }
+    }
+    appendByHeader('email_bindings', {
+      email: email,
+      name: name,
+      location: location,
+      created_at: new Date()
+    });
+    return { email: email, name: name, location: location };
+  },
+
+  getEmailBinding: function (req) {
+    const email = String(req.email || '').trim().toLowerCase();
+    if (!email) return null;
+    const rows = readAll('email_bindings');
+    const row = rows.find(function (r) { return String(r.email).toLowerCase() === email; });
+    if (!row) return null;
+    return { email: String(row.email), name: String(row.name), location: String(row.location) };
+  },
+
+  unbindEmail: function (req) {
+    const email = String(req.email || '').trim().toLowerCase();
+    if (!email) throw new Error('email 必填');
+    const sh = sheet('email_bindings');
+    const data = sh.getDataRange().getValues();
+    let deleted = 0;
+    for (let i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][0]).toLowerCase() === email) {
+        sh.deleteRow(i + 1);
+        deleted++;
+      }
+    }
+    return { email: email, deleted: deleted };
   },
 
 };

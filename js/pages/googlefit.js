@@ -5,8 +5,8 @@
  * 取得 access token 後呼叫 Fit REST API（fitness.googleapis.com）
  * 讀取最近 7 天的步數與運動時間，並可寫入自主訓練表。
  *
- * 注意：fitness.activity.read 為「受限制範圍」，OAuth 同意畫面為測試模式時，
- *       僅 Google Cloud Console 列入測試使用者的 Google 帳號可登入。
+ * 綁定機制：登入後會把 Google email 與某位「學員 + 據點」綁在後端 email_bindings 表。
+ *           綁定後寫入自主訓練時不需再選學員/日期，直接以綁定學員 + 今天日期寫入。
  */
 const GoogleFitPage = (function () {
 
@@ -19,6 +19,8 @@ const GoogleFitPage = (function () {
   let accessToken = null;
   let userEmail = null;
   let weekDays = []; // [{ dateIso, dailySteps, activeMinutes }]
+  let binding = null; // { email, name, location } 或 null
+  let bindUsersAtLocation = []; // 綁定面板的學員快取
 
   function configured() {
     return typeof APP_CONFIG !== 'undefined' && !!APP_CONFIG.GOOGLE_FIT_CLIENT_ID;
@@ -42,7 +44,6 @@ const GoogleFitPage = (function () {
     }
     accessToken = resp.access_token;
     try {
-      // 拿 email（用 token 呼叫 userinfo）
       const ui = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
         headers: { Authorization: 'Bearer ' + accessToken }
       }).then(r => r.json());
@@ -51,28 +52,77 @@ const GoogleFitPage = (function () {
       userEmail = '已登入';
     }
     renderAuthState();
+    // 讀取此 email 是否已綁定學員
+    fetchBinding();
     try {
       await loadWeekData();
-      populateDaySelect();
       document.getElementById('gfit-data-section').classList.remove('hidden');
+      updateWriteStatus();
     } catch (err) {
       showToast('讀取 Google Fit 資料失敗：' + err.message, 'error');
     }
+  }
+
+  async function fetchBinding() {
+    if (!userEmail || userEmail === '已登入') {
+      binding = null;
+      renderBindStatus();
+      updateWriteStatus();
+      return;
+    }
+    try {
+      const b = await Api.getEmailBinding({ email: userEmail });
+      binding = b || null;
+    } catch (err) {
+      // 後端尚未支援的話也 fallback 為未綁定
+      binding = null;
+    }
+    renderBindStatus();
+    updateWriteStatus();
   }
 
   function renderAuthState() {
     const label = document.getElementById('gfit-account-label');
     const signin = document.getElementById('gfit-signin-btn');
     const signout = document.getElementById('gfit-signout-btn');
+    const bindBtn = document.getElementById('gfit-bind-btn');
     if (accessToken) {
       label.textContent = '已連結：' + (userEmail || '');
       signin.classList.add('hidden');
       signout.classList.remove('hidden');
+      bindBtn.classList.remove('hidden');
     } else {
       label.textContent = '';
       signin.classList.remove('hidden');
       signout.classList.add('hidden');
+      bindBtn.classList.add('hidden');
+      closeBindPanel();
     }
+  }
+
+  function renderBindStatus() {
+    const el = document.getElementById('gfit-bind-status');
+    if (!accessToken) { el.textContent = ''; return; }
+    if (binding && binding.name && binding.location) {
+      el.textContent = '綁定學員：' + binding.name + ' @ ' + binding.location;
+    } else {
+      el.textContent = '尚未綁定學員。請按右上「綁定」按鈕設定。';
+    }
+  }
+
+  function updateWriteStatus() {
+    const el = document.getElementById('gfit-write-status');
+    if (!el) return;
+    if (!accessToken) { el.textContent = '尚未登入 Google。'; return; }
+    if (!binding) { el.textContent = '尚未綁定學員 — 寫入會被擋下。'; return; }
+    const todayIsoStr = todayIso();
+    const today = weekDays.find(d => d.dateIso === todayIsoStr);
+    const weekSteps = weekDays.reduce((s, d) => s + d.dailySteps, 0);
+    const weekMin = weekDays.reduce((s, d) => s + d.activeMinutes, 0);
+    el.textContent = '將寫入：' + binding.name + ' @ ' + binding.location +
+      '；日期 ' + todayIsoStr +
+      '；今日 ' + (today ? today.dailySteps : 0) + ' 步、' +
+      '7 天累計 ' + weekSteps.toLocaleString() + ' 步、' + weekMin + ' 分鐘運動。';
   }
 
   function handleSignin() {
@@ -95,16 +145,111 @@ const GoogleFitPage = (function () {
     accessToken = null;
     userEmail = null;
     weekDays = [];
+    binding = null;
     renderAuthState();
+    renderBindStatus();
+    updateWriteStatus();
     document.getElementById('gfit-data-section').classList.add('hidden');
     document.querySelector('#gfit-week-table tbody').innerHTML = '';
     document.getElementById('gfit-week-summary').textContent = '';
   }
 
-  // 取最近 7 天（含今天）的步數與活動分鐘
+  // ===== 綁定面板 =====
+  async function openBindPanel() {
+    const panel = document.getElementById('gfit-bind-panel');
+    panel.classList.remove('hidden');
+    // 填入據點清單
+    await populateLocationSelect('gfit-bind-location', { placeholder: '-- 請選擇 --' });
+    // 重置選擇
+    document.getElementById('gfit-bind-location').value = '';
+    document.getElementById('gfit-bind-attendees-wrap').classList.add('hidden');
+    document.getElementById('gfit-bind-attendees-list').innerHTML = '';
+  }
+
+  function closeBindPanel() {
+    const panel = document.getElementById('gfit-bind-panel');
+    if (panel) panel.classList.add('hidden');
+  }
+
+  async function handleBindLocationChange() {
+    const location = document.getElementById('gfit-bind-location').value;
+    const wrap = document.getElementById('gfit-bind-attendees-wrap');
+    if (!location) {
+      wrap.classList.add('hidden');
+      return;
+    }
+    try {
+      await loadAllUsers();
+      bindUsersAtLocation = cachedUsers
+        .filter(u => String(u.location) === location)
+        .sort((a, b) => String(a.name).localeCompare(String(b.name), 'zh-Hant'));
+      renderBindAttendeeList();
+      wrap.classList.remove('hidden');
+    } catch (err) {
+      showToast('載入學員失敗：' + err.message, 'error');
+    }
+  }
+
+  function renderBindAttendeeList() {
+    const list = document.getElementById('gfit-bind-attendees-list');
+    const hint = document.getElementById('gfit-bind-attendees-hint');
+    list.innerHTML = '';
+    if (!bindUsersAtLocation.length) {
+      hint.textContent = '此據點尚無學員，請到「設定」頁新增。';
+      return;
+    }
+    hint.textContent = '此據點共 ' + bindUsersAtLocation.length + ' 位學員，請勾選一位（一次僅能選一人）：';
+    bindUsersAtLocation.forEach((u, idx) => {
+      const id = 'gfit-bind-attendee-' + idx;
+      const wrapper = document.createElement('label');
+      wrapper.className = 'attendee-row';
+      wrapper.setAttribute('for', id);
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.id = id;
+      cb.dataset.name = u.name;
+      cb.addEventListener('change', () => handleBindAttendeeChange(cb));
+      const span = document.createElement('span');
+      span.textContent = u.name;
+      wrapper.appendChild(cb);
+      wrapper.appendChild(span);
+      list.appendChild(wrapper);
+    });
+  }
+
+  function handleBindAttendeeChange(changedCb) {
+    if (!changedCb.checked) return;
+    document.querySelectorAll('#gfit-bind-attendees-list input[type=checkbox]').forEach(other => {
+      if (other !== changedCb) other.checked = false;
+    });
+  }
+
+  async function handleBindConfirm() {
+    if (!userEmail) {
+      showToast('請先登入 Google', 'error');
+      return;
+    }
+    const location = document.getElementById('gfit-bind-location').value;
+    if (!location) { showToast('請先選擇據點', 'error'); return; }
+    const cb = document.querySelector('#gfit-bind-attendees-list input[type=checkbox]:checked');
+    if (!cb) { showToast('請勾選一位學員', 'error'); return; }
+    const name = cb.dataset.name;
+    try {
+      const result = await Api.bindEmail({ email: userEmail, name: name, location: location });
+      binding = { email: result.email, name: result.name, location: result.location };
+      showToast('綁定成功：' + name + ' @ ' + location, 'success');
+      closeBindPanel();
+      renderBindStatus();
+      updateWriteStatus();
+    } catch (err) {
+      showToast('綁定失敗：' + err.message, 'error');
+    }
+  }
+
+  // ===== 7 天資料 =====
   async function loadWeekData() {
     const today = new Date();
-    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0); // 明天 00:00（exclusive）
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1, 0, 0, 0);
     const start = new Date(end.getTime() - 7 * 86400000);
     const body = {
       aggregateBy: [
@@ -181,43 +326,29 @@ const GoogleFitPage = (function () {
       '本週合計：' + totalSteps.toLocaleString() + ' 步、' + totalMinutes + ' 分鐘運動時間';
   }
 
-  function populateDaySelect() {
-    const sel = document.getElementById('gfit-write-day');
-    const previous = sel.value;
-    sel.innerHTML = '<option value="">-- 請選擇 --</option>';
-    weekDays.slice().sort((a, b) => (a.dateIso < b.dateIso ? 1 : -1)).forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.dateIso;
-      opt.textContent = d.dateIso + '（' + d.dailySteps + ' 步、' + d.activeMinutes + ' 分鐘）';
-      sel.appendChild(opt);
-    });
-    if (previous) sel.value = previous;
-  }
-
+  // ===== 寫入 =====
   async function handleWriteSubmit(e) {
     e.preventDefault();
     if (!accessToken) { showToast('請先登入 Google', 'error'); return; }
-    const userVal = document.getElementById('gfit-write-user').value;
-    const dateIso = document.getElementById('gfit-write-day').value;
-    if (!userVal) { showToast('請選擇學員', 'error'); return; }
-    if (!dateIso) { showToast('請選擇日期', 'error'); return; }
-    const u = decodeUser(userVal);
-    if (!u) { showToast('學員資料解析失敗', 'error'); return; }
-    const day = weekDays.find(d => d.dateIso === dateIso);
-    if (!day) { showToast('找不到對應日期的資料', 'error'); return; }
-    // 同時計算近 7 天的累計（直接寫入 weekly_steps / weekly_exercise_minutes）
+    if (!binding || !binding.name || !binding.location) {
+      showToast('尚未綁定學員，請先按「綁定」', 'error');
+      return;
+    }
+    // 用今天的 daily steps（若沒有則 0），週累計直接加總 7 天
+    const todayIsoStr = todayIso();
+    const today = weekDays.find(d => d.dateIso === todayIsoStr);
     const weekTotalSteps = weekDays.reduce((s, d) => s + d.dailySteps, 0);
     const weekTotalMinutes = weekDays.reduce((s, d) => s + d.activeMinutes, 0);
     try {
       await Api.addSelfRecord({
-        name: u.name,
-        location: u.location,
-        train_date: dateIso,
-        daily_steps: day.dailySteps,
+        name: binding.name,
+        location: binding.location,
+        // train_date 不傳：後端會自動以當天日期寫入
+        daily_steps: today ? today.dailySteps : 0,
         weekly_steps: weekTotalSteps,
         weekly_exercise_minutes: weekTotalMinutes,
       });
-      showToast('已寫入自主訓練（' + dateIso + '）', 'success');
+      showToast('已寫入自主訓練（' + todayIsoStr + '）', 'success');
     } catch (err) {
       showToast('寫入失敗：' + err.message, 'error');
     }
@@ -230,14 +361,18 @@ const GoogleFitPage = (function () {
     }
     document.getElementById('gfit-config-warning').classList.add('hidden');
     setupTokenClient();
-    // 切到此頁時刷新一下使用者下拉
-    await populateUserSelect('gfit-write-user');
     renderAuthState();
+    renderBindStatus();
+    updateWriteStatus();
   }
 
   function init() {
     document.getElementById('gfit-signin-btn').addEventListener('click', handleSignin);
     document.getElementById('gfit-signout-btn').addEventListener('click', handleSignout);
+    document.getElementById('gfit-bind-btn').addEventListener('click', openBindPanel);
+    document.getElementById('gfit-bind-cancel').addEventListener('click', closeBindPanel);
+    document.getElementById('gfit-bind-confirm').addEventListener('click', handleBindConfirm);
+    document.getElementById('gfit-bind-location').addEventListener('change', handleBindLocationChange);
     document.getElementById('gfit-write-form').addEventListener('submit', handleWriteSubmit);
   }
 

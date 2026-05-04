@@ -194,6 +194,25 @@
           <button id="gfit-signin-btn" type="button" class="primary">登入 Google</button>
           <span id="gfit-account-label" class="hint" style="margin-left:12px"></span>
           <button id="gfit-signout-btn" type="button" class="hidden" style="margin-left:12px">登出</button>
+          <button id="gfit-bind-btn" type="button" class="hidden" style="margin-left:8px">綁定</button>
+        </div>
+        <div id="gfit-bind-status" class="hint" style="margin-top:8px"></div>
+        <div id="gfit-bind-panel" class="hidden" style="margin-top:12px;border:1px dashed var(--border);border-radius:6px;padding:12px">
+          <h4 style="margin:0 0 10px;font-size:14px">綁定學員到此 Google 帳號</h4>
+          <label>
+            據點
+            <select id="gfit-bind-location">
+              <option value="">-- 請選擇 --</option>
+            </select>
+          </label>
+          <div id="gfit-bind-attendees-wrap" class="hidden">
+            <p class="hint" id="gfit-bind-attendees-hint"></p>
+            <div id="gfit-bind-attendees-list" class="checkbox-list"></div>
+          </div>
+          <div class="row">
+            <button id="gfit-bind-confirm" type="button" class="primary">確認綁定</button>
+            <button id="gfit-bind-cancel" type="button">取消</button>
+          </div>
         </div>
       </div>
 
@@ -209,21 +228,8 @@
 
         <form id="gfit-write-form" class="card">
           <h3>寫入自主訓練</h3>
-          <p class="hint">把今日（或最近一天）的步數與運動分鐘寫入指定學員的自主訓練紀錄。</p>
-          <div class="row">
-            <label>
-              學員
-              <select id="gfit-write-user" required>
-                <option value="">-- 請選擇 --</option>
-              </select>
-            </label>
-            <label>
-              日期
-              <select id="gfit-write-day" required>
-                <option value="">-- 請選擇 --</option>
-              </select>
-            </label>
-          </div>
+          <p class="hint">會寫入到上方「綁定」的學員，日期自動為今天，內容包含今天的步數與近 7 天累計。</p>
+          <div id="gfit-write-status" class="hint"></div>
           <button type="submit" class="primary">寫入</button>
         </form>
       </div>
@@ -314,12 +320,12 @@
 
   <!-- JS 載入順序：config → api → pages → app -->
   <script src="js/config.js"></script>
-  <script src="js/api.js?v=4"></script>
+  <script src="js/api.js?v=5"></script>
   <script src="js/pages/settings.js?v=5"></script>
   <script src="js/pages/checkin.js?v=5"></script>
   <script src="js/pages/weights.js?v=3"></script>
   <script src="js/pages/self.js?v=5"></script>
-  <script src="js/pages/googlefit.js?v=2"></script>
+  <script src="js/pages/googlefit.js?v=3"></script>
   <script src="js/app.js?v=2"></script>
 </body>
 </html>

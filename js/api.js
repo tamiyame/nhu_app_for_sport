@@ -62,4 +62,9 @@ const Api = {
   addSelfRecord:      (p)      => callApi('addSelfRecord', p),
   listSelfRecords:    (p)      => callApi('listSelfRecords', p),
   deleteSelfRecord:   (id)     => callApi('deleteSelfRecord', { id }),
+
+  // email <-> user binding (Google Fit)
+  bindEmail:          (p)      => callApi('bindEmail', p),
+  getEmailBinding:    (p)      => callApi('getEmailBinding', p),
+  unbindEmail:        (p)      => callApi('unbindEmail', p),
 };
